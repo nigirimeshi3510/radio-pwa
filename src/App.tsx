@@ -138,6 +138,7 @@ export default function App() {
   const [duration, setDuration] = useState(0);
   const [isDockExpanded, setIsDockExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabId>('player');
   const [form, setForm] = useState<FormState>({
     title: '',
@@ -179,12 +180,14 @@ export default function App() {
     });
   }, [normalizedSearchQuery, prefs.sortMode, selectedItems]);
   const filteredItems = useMemo(() => {
-    if (!normalizedSearchQuery) {
+    const normalizedLibrarySearchQuery = extractDigits(librarySearchQuery);
+
+    if (!normalizedLibrarySearchQuery) {
       return items;
     }
 
-    return items.filter((item) => extractDigits(item.title).includes(normalizedSearchQuery));
-  }, [items, normalizedSearchQuery]);
+    return items.filter((item) => extractDigits(item.title).includes(normalizedLibrarySearchQuery));
+  }, [items, librarySearchQuery]);
   const activeItem = useMemo(
     () => items.find((item) => item.id === activeId) ?? null,
     [activeId, items],
@@ -1026,6 +1029,17 @@ export default function App() {
                 <div className="section-head">
                   <span className="section-label">登録済み音源</span>
                   <span className="count-chip">{items.length}件</span>
+                </div>
+
+                <div className="search-bar">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="検索"
+                    value={librarySearchQuery}
+                    onChange={(event) => setLibrarySearchQuery(extractDigits(event.target.value))}
+                  />
                 </div>
 
                 <div className="station-list">
