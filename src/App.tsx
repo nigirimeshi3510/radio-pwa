@@ -15,6 +15,7 @@ import {
   formatHostLabel,
   isValidMp3Url,
   makeId,
+  parseCsvEntries,
   normalizeTitle,
   parseBatchUrls,
 } from './utils';
@@ -650,6 +651,67 @@ export default function App() {
     );
   }
 
+  async function handleCsvImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const text = await file.text();
+    const rows = parseCsvEntries(text);
+
+    if (rows.length === 0) {
+      setError('CSVに取り込めるデータがありませんでした。');
+      setBatchMessage('');
+      event.target.value = '';
+      return;
+    }
+
+    const existingUrls = new Set(items.map((item) => item.url));
+    const seen = new Set<string>();
+    const validEntries: RadioItem[] = [];
+    let invalidCount = 0;
+    let duplicateCount = 0;
+
+    rows.forEach((row) => {
+      const url = row.url.trim();
+      if (!isValidMp3Url(url)) {
+        invalidCount += 1;
+        return;
+      }
+
+      if (existingUrls.has(url) || seen.has(url)) {
+        duplicateCount += 1;
+        return;
+      }
+
+      seen.add(url);
+      validEntries.push({
+        id: makeId(),
+        title: normalizeTitle(row.title, url),
+        url,
+        createdAt: new Date().toISOString(),
+        playlistId: batchForm.playlistId,
+      });
+    });
+
+    if (validEntries.length === 0) {
+      setError('CSVから追加できるURLがありませんでした。');
+      setBatchMessage('');
+      event.target.value = '';
+      return;
+    }
+
+    setItems((current) => [...validEntries, ...current]);
+    setError('');
+    setBatchMessage(
+      `CSVから${validEntries.length}件追加しました。` +
+        (duplicateCount > 0 ? ` 重複 ${duplicateCount}件をスキップ。` : '') +
+        (invalidCount > 0 ? ` 無効URL ${invalidCount}件をスキップ。` : ''),
+    );
+    event.target.value = '';
+  }
+
   function renamePlaylist(playlistId: string, name: string) {
     setPlaylists((current) =>
       current.map((playlist) =>
@@ -890,6 +952,18 @@ export default function App() {
                     まとめて追加する
                   </button>
                 </form>
+
+                <div className="csv-import">
+                  <label className="file-upload">
+                    <span>CSVファイルから追加</span>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={handleCsvImport}
+                    />
+                  </label>
+                  <p className="file-upload-note">`url,title` または `title,url` ヘッダー付きCSVに対応</p>
+                </div>
 
                 <div className="notice-stack">
                   <p className="notice">タイトルはURL末尾のファイル名で自動登録します。</p>

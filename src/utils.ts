@@ -83,3 +83,63 @@ export function parseBatchUrls(value: string) {
 export function extractDigits(value: string) {
   return value.replace(/\D+/g, '');
 }
+
+function parseCsvLine(line: string) {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+export function parseCsvEntries(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const header = parseCsvLine(lines[0]).map((value) => value.toLowerCase());
+  const titleIndex = header.findIndex((value) => value === 'title' || value === 'タイトル');
+  const urlIndex = header.findIndex((value) => value === 'url' || value === 'link' || value === 'リンク');
+
+  const hasHeader = titleIndex !== -1 || urlIndex !== -1;
+  const startIndex = hasHeader ? 1 : 0;
+
+  return lines.slice(startIndex).map((line) => {
+    const columns = parseCsvLine(line);
+    const url = urlIndex !== -1 ? columns[urlIndex] ?? '' : columns[0] ?? '';
+    const title = titleIndex !== -1 ? columns[titleIndex] ?? '' : columns[1] ?? '';
+    return {
+      url: url.trim(),
+      title: title.trim(),
+    };
+  });
+}

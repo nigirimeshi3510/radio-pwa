@@ -199,6 +199,26 @@ button {
   font-size: 16px;
 }
 
+.csv-import {
+  margin-top: 12px;
+}
+
+.file-upload {
+  display: grid;
+  gap: 8px;
+}
+
+.file-upload input[type='file'] {
+  width: 100%;
+  color: #203445;
+}
+
+.file-upload-note {
+  margin: 8px 0 0;
+  color: var(--text-subtle);
+  font-size: 0.84rem;
+}
+
 .player-toolbar {
   margin-bottom: 14px;
 }
