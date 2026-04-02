@@ -156,12 +156,28 @@ export default function App() {
   );
   const normalizedSearchQuery = extractDigits(searchQuery);
   const filteredSelectedItems = useMemo(() => {
-    if (!normalizedSearchQuery) {
-      return selectedItems;
+    const filtered = !normalizedSearchQuery
+      ? selectedItems
+      : selectedItems.filter((item) => extractDigits(item.title).includes(normalizedSearchQuery));
+
+    if (prefs.sortMode === 'default') {
+      return filtered;
     }
 
-    return selectedItems.filter((item) => extractDigits(item.title).includes(normalizedSearchQuery));
-  }, [normalizedSearchQuery, selectedItems]);
+    const direction = prefs.sortMode === 'number_desc' ? -1 : 1;
+    return [...filtered].sort((left, right) => {
+      const leftDigits = extractDigits(left.title);
+      const rightDigits = extractDigits(right.title);
+      const leftValue = leftDigits ? Number(leftDigits) : Number.NEGATIVE_INFINITY;
+      const rightValue = rightDigits ? Number(rightDigits) : Number.NEGATIVE_INFINITY;
+
+      if (leftValue === rightValue) {
+        return left.createdAt.localeCompare(right.createdAt) * direction;
+      }
+
+      return (leftValue - rightValue) * direction;
+    });
+  }, [normalizedSearchQuery, prefs.sortMode, selectedItems]);
   const filteredItems = useMemo(() => {
     if (!normalizedSearchQuery) {
       return items;
@@ -795,17 +811,33 @@ export default function App() {
             <>
               <section className="panel now-playing">
                 <div className="player-toolbar">
-                  <select
-                    className="playlist-select"
-                    value={selectedPlaylistId}
-                    onChange={(event) => switchPlaylist(event.target.value)}
-                  >
-                    {playlists.map((playlist) => (
-                      <option key={playlist.id} value={playlist.id}>
-                        {playlist.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="player-toolbar-grid">
+                    <select
+                      className="playlist-select"
+                      value={selectedPlaylistId}
+                      onChange={(event) => switchPlaylist(event.target.value)}
+                    >
+                      {playlists.map((playlist) => (
+                        <option key={playlist.id} value={playlist.id}>
+                          {playlist.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="playlist-select"
+                      value={prefs.sortMode}
+                      onChange={(event) =>
+                        setPrefs((current) => ({
+                          ...current,
+                          sortMode: event.target.value as PlaybackPrefs['sortMode'],
+                        }))
+                      }
+                    >
+                      <option value="default">並び替えなし</option>
+                      <option value="number_desc">番号が新しい順</option>
+                      <option value="number_asc">番号が古い順</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="track-card">

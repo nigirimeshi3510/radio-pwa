@@ -44,6 +44,7 @@ export const defaultPrefs: PlaybackPrefs = {
   shuffle: false,
   volume: 0.85,
   selectedPlaylistId: DEFAULT_PLAYLISTS[0].id,
+  sortMode: 'default',
   lastPlayedByPlaylist: {
     [DEFAULT_PLAYLISTS[0].id]: undefined,
     [DEFAULT_PLAYLISTS[1].id]: undefined,

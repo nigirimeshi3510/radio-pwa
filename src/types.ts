@@ -1,4 +1,5 @@
 export type PlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+export type SortMode = 'default' | 'number_desc' | 'number_asc';
 
 export type TabId = 'player' | 'library';
 
@@ -20,4 +21,5 @@ export type PlaybackPrefs = {
   volume: number;
   selectedPlaylistId: string;
   lastPlayedByPlaylist: Record<string, string | undefined>;
+  sortMode: SortMode;
 };

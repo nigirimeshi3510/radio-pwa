@@ -174,8 +174,10 @@ button {
 
 .track-card h2 {
   margin: 0;
+  min-width: 0;
   font-size: clamp(1.4rem, 5vw, 2.2rem);
   line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 
 .track-card p {
@@ -221,6 +223,11 @@ button {
 
 .player-toolbar {
   margin-bottom: 14px;
+}
+
+.player-toolbar-grid {
+  display: grid;
+  gap: 10px;
 }
 
 .playlist-select {
@@ -301,6 +308,7 @@ button {
   display: flex;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
   min-height: 52px;
   padding: 0 8px;
   background: transparent;
@@ -478,6 +486,8 @@ button {
 
 .station-main strong {
   font-size: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .station-main span {
@@ -511,6 +521,10 @@ button {
 @media (min-width: 720px) {
   .app-shell {
     padding-inline: 24px;
+  }
+
+  .player-toolbar-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .bottom-player-dock {
