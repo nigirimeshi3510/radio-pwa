@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_PLAYLISTS,
-  loadItems,
-  loadPlaylists,
-  loadPrefs,
+  defaultItems,
+  defaultPrefs,
+  loadAppData,
   saveItems,
   savePlaylists,
   savePrefs,
@@ -119,16 +119,14 @@ function SeekForwardIcon() {
 }
 
 export default function App() {
-  const initialPrefs = loadPrefs();
-  const initialItems = loadItems();
-  const initialPlaylists = loadPlaylists();
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [items, setItems] = useState<RadioItem[]>(initialItems);
-  const [playlists, setPlaylists] = useState<Playlist[]>(initialPlaylists);
-  const [prefs, setPrefs] = useState<PlaybackPrefs>(initialPrefs);
+  const [items, setItems] = useState<RadioItem[]>(defaultItems);
+  const [playlists, setPlaylists] = useState<Playlist[]>(DEFAULT_PLAYLISTS);
+  const [prefs, setPrefs] = useState<PlaybackPrefs>(defaultPrefs);
   const [activeId, setActiveId] = useState<string | null>(
-    initialPrefs.lastPlayedByPlaylist[initialPrefs.selectedPlaylistId] ?? null,
+    defaultPrefs.lastPlayedByPlaylist[defaultPrefs.selectedPlaylistId] ?? null,
   );
+  const [hydrated, setHydrated] = useState(false);
   const [playbackState, setPlaybackState] = useState<PlaybackState>('idle');
   const [statusText, setStatusText] = useState('停止中');
   const [error, setError] = useState('');
@@ -143,7 +141,7 @@ export default function App() {
   const [form, setForm] = useState<FormState>({
     title: '',
     url: '',
-    playlistId: initialPrefs.selectedPlaylistId,
+    playlistId: defaultPrefs.selectedPlaylistId,
   });
   const [batchForm, setBatchForm] = useState(BATCH_FORM_DEFAULT);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -176,18 +174,64 @@ export default function App() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+
+    void loadAppData()
+      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+
+        setItems(data.items);
+        setPlaylists(data.playlists);
+        setPrefs(data.prefs);
+        setActiveId(data.prefs.lastPlayedByPlaylist[data.prefs.selectedPlaylistId] ?? null);
+        setForm((current) => ({
+          ...current,
+          playlistId: data.prefs.selectedPlaylistId,
+        }));
+        setBatchForm((current) => ({
+          ...current,
+          playlistId: data.prefs.selectedPlaylistId,
+        }));
+        setHydrated(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHydrated(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
     saveItems(items);
-  }, [items]);
+  }, [hydrated, items]);
 
   useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
     savePlaylists(playlists);
-  }, [playlists]);
+  }, [hydrated, playlists]);
 
   useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
     savePrefs(prefs);
-  }, [prefs]);
+  }, [hydrated, prefs]);
 
   useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
     setPrefs((current) => ({
       ...current,
       lastPlayedByPlaylist: {
@@ -195,7 +239,7 @@ export default function App() {
         [selectedPlaylistId]: activeId ?? undefined,
       },
     }));
-  }, [activeId, selectedPlaylistId]);
+  }, [activeId, hydrated, selectedPlaylistId]);
 
   useEffect(() => {
     setForm((current) => ({

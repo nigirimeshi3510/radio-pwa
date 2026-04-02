@@ -3,9 +3,18 @@ import { makeId } from './utils';
 
 const LEGACY_ITEMS_KEY = 'radio.items.v1';
 const LEGACY_PREFS_KEY = 'radio.playback-prefs.v1';
-const ITEMS_KEY = 'radio.items.v2';
-const PLAYLISTS_KEY = 'radio.playlists.v1';
-const PREFS_KEY = 'radio.playback-prefs.v2';
+const LEGACY_ITEMS_V2_KEY = 'radio.items.v2';
+const LEGACY_PLAYLISTS_KEY = 'radio.playlists.v1';
+const LEGACY_PREFS_V2_KEY = 'radio.playback-prefs.v2';
+
+const DB_NAME = 'radio-desk-db';
+const DB_VERSION = 1;
+const STORE_NAME = 'kv';
+
+const ITEMS_KEY = 'items';
+const PLAYLISTS_KEY = 'playlists';
+const PREFS_KEY = 'prefs';
+const MIGRATION_KEY = 'migrated-from-localstorage';
 
 export const DEFAULT_PLAYLISTS: Playlist[] = [
   { id: 'playlist-1', name: 'リスト1' },
@@ -14,7 +23,7 @@ export const DEFAULT_PLAYLISTS: Playlist[] = [
 
 const bootstrapDate = new Date().toISOString();
 
-const defaultItems: RadioItem[] = [
+export const defaultItems: RadioItem[] = [
   {
     id: makeId(),
     title: '匿名ラジオ 50',
@@ -31,7 +40,7 @@ const defaultItems: RadioItem[] = [
   },
 ];
 
-const defaultPrefs: PlaybackPrefs = {
+export const defaultPrefs: PlaybackPrefs = {
   shuffle: false,
   volume: 0.85,
   selectedPlaylistId: DEFAULT_PLAYLISTS[0].id,
@@ -71,8 +80,59 @@ function safeParse<T>(key: string, fallback: T): T {
   }
 }
 
-export function loadItems() {
-  const stored = safeParse<RadioItem[]>(ITEMS_KEY, []);
+function hasIndexedDb() {
+  return typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
+}
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function readValue<T>(key: string): Promise<T | undefined> {
+  const db = await openDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      resolve(request.result as T | undefined);
+    };
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function writeValue<T>(key: string, value: T): Promise<void> {
+  const db = await openDb();
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(value, key);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function buildLegacyItems() {
+  const stored = safeParse<RadioItem[]>(LEGACY_ITEMS_V2_KEY, []);
   if (stored.length > 0) {
     return stored;
   }
@@ -88,25 +148,17 @@ export function loadItems() {
   return defaultItems;
 }
 
-export function saveItems(items: RadioItem[]) {
-  window.localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
-}
-
-export function loadPlaylists() {
-  const stored = safeParse<Playlist[]>(PLAYLISTS_KEY, []);
-  if (stored.length === DEFAULT_PLAYLISTS.length) {
+function buildLegacyPlaylists() {
+  const stored = safeParse<Playlist[]>(LEGACY_PLAYLISTS_KEY, []);
+  if (stored.length > 0) {
     return stored;
   }
 
   return DEFAULT_PLAYLISTS;
 }
 
-export function savePlaylists(playlists: Playlist[]) {
-  window.localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
-}
-
-export function loadPrefs() {
-  const stored = safeParse<PlaybackPrefs | null>(PREFS_KEY, null);
+function buildLegacyPrefs() {
+  const stored = safeParse<PlaybackPrefs | null>(LEGACY_PREFS_V2_KEY, null);
   if (stored) {
     return {
       ...defaultPrefs,
@@ -130,6 +182,81 @@ export function loadPrefs() {
   };
 }
 
+async function migrateFromLocalStorageIfNeeded() {
+  if (!hasIndexedDb()) {
+    return;
+  }
+
+  const migrated = await readValue<boolean>(MIGRATION_KEY);
+  if (migrated) {
+    return;
+  }
+
+  const items = buildLegacyItems();
+  const playlists = buildLegacyPlaylists();
+  const prefs = buildLegacyPrefs();
+
+  await Promise.all([
+    writeValue(ITEMS_KEY, items),
+    writeValue(PLAYLISTS_KEY, playlists),
+    writeValue(PREFS_KEY, prefs),
+    writeValue(MIGRATION_KEY, true),
+  ]);
+}
+
+export async function loadAppData() {
+  if (!hasIndexedDb()) {
+    return {
+      items: buildLegacyItems(),
+      playlists: buildLegacyPlaylists(),
+      prefs: buildLegacyPrefs(),
+    };
+  }
+
+  await migrateFromLocalStorageIfNeeded();
+
+  const [items, playlists, prefs] = await Promise.all([
+    readValue<RadioItem[]>(ITEMS_KEY),
+    readValue<Playlist[]>(PLAYLISTS_KEY),
+    readValue<PlaybackPrefs>(PREFS_KEY),
+  ]);
+
+  return {
+    items: items && items.length > 0 ? items : defaultItems,
+    playlists: playlists && playlists.length > 0 ? playlists : DEFAULT_PLAYLISTS,
+    prefs: prefs
+      ? {
+          ...defaultPrefs,
+          ...prefs,
+          lastPlayedByPlaylist: {
+            ...defaultPrefs.lastPlayedByPlaylist,
+            ...prefs.lastPlayedByPlaylist,
+          },
+        }
+      : defaultPrefs,
+  };
+}
+
+export function saveItems(items: RadioItem[]) {
+  if (!hasIndexedDb()) {
+    window.localStorage.setItem(LEGACY_ITEMS_V2_KEY, JSON.stringify(items));
+    return Promise.resolve();
+  }
+  return writeValue(ITEMS_KEY, items);
+}
+
+export function savePlaylists(playlists: Playlist[]) {
+  if (!hasIndexedDb()) {
+    window.localStorage.setItem(LEGACY_PLAYLISTS_KEY, JSON.stringify(playlists));
+    return Promise.resolve();
+  }
+  return writeValue(PLAYLISTS_KEY, playlists);
+}
+
 export function savePrefs(prefs: PlaybackPrefs) {
-  window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  if (!hasIndexedDb()) {
+    window.localStorage.setItem(LEGACY_PREFS_V2_KEY, JSON.stringify(prefs));
+    return Promise.resolve();
+  }
+  return writeValue(PREFS_KEY, prefs);
 }
