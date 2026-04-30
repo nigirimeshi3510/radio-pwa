@@ -289,7 +289,7 @@ button {
 
 .control-cluster {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px 64px;
+  grid-template-columns: minmax(0, 1fr) 56px 64px 56px;
   gap: 10px;
   padding: 12px;
   border: 1px solid rgba(46, 127, 176, 0.16);
