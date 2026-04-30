@@ -66,6 +66,16 @@ function NextIcon() {
   );
 }
 
+function PreviousIcon() {
+  return (
+    <IconBase>
+      <path d="M18 7v10l-7-5z" fill="currentColor" />
+      <path d="M11 7v10l-7-5z" fill="currentColor" />
+      <rect x="3" y="7" width="1.5" height="10" rx="0.75" fill="currentColor" />
+    </IconBase>
+  );
+}
+
 function ShuffleIcon() {
   return (
     <IconBase>
@@ -1126,6 +1136,15 @@ export default function App() {
               aria-label="シークバーを開閉"
             >
               <span>{activeItem?.title ?? '未再生'}</span>
+            </button>
+            <button
+              type="button"
+              className="secondary icon-button"
+              onClick={playPrevious}
+              disabled={selectedItems.length === 0}
+              aria-label="前へ"
+            >
+              <PreviousIcon />
             </button>
             <button
               type="button"
