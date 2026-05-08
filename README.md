@@ -4,7 +4,7 @@
 
 GitHub Pages 公開先:
 
-- `https://nigirimeshi3510.github.io/radio-pwa/`
+- `https://norei3510.github.io/radio-pwa/`
 
 ## Scripts
 
